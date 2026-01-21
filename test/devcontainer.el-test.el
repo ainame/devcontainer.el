@@ -1080,4 +1080,85 @@
     (mocker-let ((some-function-call (arg) ((:input '(123)))))
       (with-current-buffer (find-file-noselect "some-file-10.md")))))
 
+(ert-deftest devcontainer-remote-environment-with-string-values ()
+  "Test remote environment with normal string values."
+  (let ((metadata '((remoteUser . "app-user")
+                    (remoteEnv . (("VAR1" . "value1")
+                                  ("VAR2" . "value2"))))))
+    (mocker-let ((devcontainer--container-metadata () ((:output metadata)))
+                 (devcontainer--root () ((:output "/test/project" :min-occur 0))))
+      (should (equal (devcontainer-remote-environment)
+                     '(("VAR1" . "value1")
+                       ("VAR2" . "value2")))))))
+
+(ert-deftest devcontainer-remote-environment-with-null-values ()
+  "Test that null values are filtered out."
+  (let ((metadata '((remoteUser . "app-user")
+                    (remoteEnv . (("VAR1" . "value1")
+                                  ("NULL_VAR" . :null)
+                                  ("VAR2" . "value2"))))))
+    (mocker-let ((devcontainer--container-metadata () ((:output metadata)))
+                 (devcontainer--root () ((:output "/test/project" :min-occur 0))))
+      (should (equal (devcontainer-remote-environment)
+                     '(("VAR1" . "value1")
+                       ("VAR2" . "value2")))))))
+
+(ert-deftest devcontainer-remote-environment-with-empty-string ()
+  "Test that empty strings are preserved."
+  (let ((metadata '((remoteUser . "app-user")
+                    (remoteEnv . (("VAR1" . "value1")
+                                  ("EMPTY_VAR" . "")
+                                  ("VAR2" . "value2"))))))
+    (mocker-let ((devcontainer--container-metadata () ((:output metadata)))
+                 (devcontainer--root () ((:output "/test/project" :min-occur 0))))
+      (should (equal (devcontainer-remote-environment)
+                     '(("VAR1" . "value1")
+                       ("EMPTY_VAR" . "")
+                       ("VAR2" . "value2")))))))
+
+(ert-deftest devcontainer-remote-environment-with-variable-interpolation ()
+  "Test variable interpolation in remote environment."
+  (let ((metadata '((remoteUser . "app-user")
+                    (remoteEnv . (("PROJECT_NAME" . "${localWorkspaceFolderBasename}"))))))
+    (mocker-let ((devcontainer--container-metadata () ((:output metadata)))
+                 (devcontainer--root () ((:output "/home/user/my-project" :min-occur 0))))
+      (should (equal (devcontainer-remote-environment)
+                     '(("PROJECT_NAME" . "my-project")))))))
+
+(ert-deftest devcontainer-remote-environment-with-mixed-values ()
+  "Test remote environment with mixed value types."
+  (let ((metadata '((remoteUser . "app-user")
+                    (remoteEnv . (("VALID_VAR" . "value")
+                                  ("NULL_VAR" . :null)
+                                  ("EMPTY_VAR" . "")
+                                  ("INTERPOLATED" . "${localWorkspaceFolderBasename}")
+                                  ("ANOTHER_VAR" . "another"))))))
+    (mocker-let ((devcontainer--container-metadata () ((:output metadata)))
+                 (devcontainer--root () ((:output "/path/to/project" :min-occur 0))))
+      (should (equal (devcontainer-remote-environment)
+                     '(("VALID_VAR" . "value")
+                       ("EMPTY_VAR" . "")
+                       ("INTERPOLATED" . "project")
+                       ("ANOTHER_VAR" . "another")))))))
+
+(ert-deftest devcontainer-remote-environment-no-metadata ()
+  "Test when container metadata is not available."
+  (mocker-let ((devcontainer--container-metadata () ((:output nil))))
+    (should (equal (devcontainer-remote-environment) nil))))
+
+(ert-deftest devcontainer-remote-environment-no-remote-env ()
+  "Test when remoteEnv is not present in metadata."
+  (let ((metadata '((remoteUser . "app-user"))))
+    (mocker-let ((devcontainer--container-metadata () ((:output metadata))))
+      (should (equal (devcontainer-remote-environment) nil)))))
+
+(ert-deftest devcontainer-remote-environment-all-null ()
+  "Test when all values are null."
+  (let ((metadata '((remoteUser . "app-user")
+                    (remoteEnv . (("VAR1" . :null)
+                                  ("VAR2" . :null))))))
+    (mocker-let ((devcontainer--container-metadata () ((:output metadata)))
+                 (devcontainer--root () ((:output "/test/project" :min-occur 0))))
+      (should (equal (devcontainer-remote-environment) nil)))))
+
 ;;; devcontainer.el-test.el ends here

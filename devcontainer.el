@@ -781,9 +781,13 @@ FILENAME and ARGS are just passed."
 (defun devcontainer-remote-environment ()
   "Retrieve the defined remote environment of current devcontainer if it's up."
   (when-let* ((metadata (devcontainer--container-metadata)))
-    (mapcar (lambda (elt)
-              (cons (car elt) (devcontainer--interpolate-variable (cdr elt))))
-            (alist-get 'remoteEnv metadata))))
+    (delq nil
+          (mapcar (lambda (elt)
+                    (let ((value (cdr elt)))
+                      (when (and value (not (eq value :null)) (stringp value))
+                        (cons (car elt)
+                              (devcontainer--interpolate-variable value)))))
+                  (alist-get 'remoteEnv metadata)))))
 
 (defun devcontainer--interpolate-variable (string)
   "Interpolate devcontainer variable into STRING."
