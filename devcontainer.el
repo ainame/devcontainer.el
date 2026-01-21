@@ -900,11 +900,14 @@ trap cleanup SIGINT SIGTERM EXIT
 # Get listening ports in container
 get_listening_ports() {
     docker exec \"$CONTAINER_ID\" cat /proc/net/tcp 2>/dev/null | \\
-        awk 'NR>1 && $4 == \"0A\" {
-            split($2, a, \":\");
-            port = (\"0x\" a[2]) + 0;
-            if (port >= 1024 && port != 22) print port;
-        }' | sort -u
+        perl -ne '
+            next if $. == 1;
+            my @fields = split;
+            next unless $fields[3] eq \"0A\";
+            my ($addr, $port_hex) = split(/:/, $fields[1]);
+            my $port = hex($port_hex);
+            print \"$port\\n\" if $port >= 1024 && $port != 22;
+        ' | sort -u
 }
 
 # Check if port is already forwarded
