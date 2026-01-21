@@ -887,9 +887,11 @@ fi
 # Cleanup on exit
 cleanup() {
     echo \"Stopping all port forwards...\"
-    for pid in \"${SOCAT_PIDS[@]}\"; do
-        kill \"$pid\" 2>/dev/null || true
-    done
+    if [ ${#SOCAT_PIDS[@]} -gt 0 ]; then
+        for pid in \"${SOCAT_PIDS[@]}\"; do
+            kill \"$pid\" 2>/dev/null || true
+        done
+    fi
     exit 0
 }
 
@@ -900,7 +902,7 @@ get_listening_ports() {
     docker exec \"$CONTAINER_ID\" cat /proc/net/tcp 2>/dev/null | \\
         awk 'NR>1 && $4 == \"0A\" {
             split($2, a, \":\");
-            port = strtonum(\"0x\" a[2]);
+            port = (\"0x\" a[2]) + 0;
             if (port >= 1024 && port != 22) print port;
         }' | sort -u
 }
@@ -908,6 +910,9 @@ get_listening_ports() {
 # Check if port is already forwarded
 is_forwarded() {
     local port=\"$1\"
+    if [ ${#FORWARDED_PORTS[@]} -eq 0 ]; then
+        return 1
+    fi
     for p in \"${FORWARDED_PORTS[@]}\"; do
         if [ \"$p\" = \"$port\" ]; then
             return 0
