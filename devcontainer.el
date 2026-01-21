@@ -566,11 +566,12 @@ There are the following customization options:
 * `devcontainer-term-environment' to add custom modifications to the
   environment."
   (interactive)
-  (when (devcontainer-up-container-id)
-    (funcall devcontainer-term-function
-             (string-join (append (devcontainer-advice 'in-terminal)
-                                  `(,devcontainer-term-shell))
-                          " "))))
+  (if (devcontainer-up-container-id)
+      (funcall devcontainer-term-function
+               (string-join (append (devcontainer-advice 'in-terminal)
+                                    `(,devcontainer-term-shell))
+                            " "))
+    (user-error "The devcontainer is not running.  Please start it first with M-x devcontainer-up")))
 
 (defun devcontainer--workspace-folder ()
   "Retrieve the `--workspace-folder' switch for the current project root."
