@@ -1044,6 +1044,58 @@ CONTAINER-ID is used to identify the container.  Other arguments are ignored."
 ;;   (add-hook 'devcontainer-post-startup-hook #'devcontainer--maybe-start-port-forwarding)
 
 
+;;;; Browser forwarding
+
+(defconst devcontainer--browser-wrapper-script
+  "#!/bin/bash
+# devcontainer-browser-wrapper.sh
+# Intercept browser open requests from container and forward to host
+
+URL=\"$1\"
+
+# Echo to stderr so it can be captured by the terminal emulator
+echo \"DEVCONTAINER_OPEN_BROWSER: $URL\" >&2
+
+# Log to file for debugging
+echo \"========================================\" >> /tmp/browser.log
+echo \"BROWSER OPEN REQUEST at $(date)\" >> /tmp/browser.log
+echo \"URL: $URL\" >> /tmp/browser.log
+echo \"========================================\" >> /tmp/browser.log
+
+exit 0
+"
+  "Browser wrapper script content that intercepts browser open requests.")
+
+(defun devcontainer-install-browser-wrapper ()
+  "Install browser wrapper script in the current devcontainer.
+
+This installs a script that intercepts browser open requests
+from tools like AWS CLI and forwards them to the host."
+  (interactive)
+  (if-let ((container-id (devcontainer-up-container-id)))
+      (progn
+        ;; Install script in container
+        (with-temp-buffer
+          (insert devcontainer--browser-wrapper-script)
+          (let ((tmpfile (make-temp-file "browser-wrapper-")))
+            (write-region (point-min) (point-max) tmpfile)
+            (unwind-protect
+                (progn
+                  (call-process "docker" nil nil nil
+                                "cp" tmpfile
+                                (format "%s:/tmp/devcontainer-browser-wrapper" container-id))
+                  (call-process "docker" nil nil nil
+                                "exec" container-id
+                                "chmod" "+x" "/tmp/devcontainer-browser-wrapper")
+                  (message "Browser wrapper installed. Set BROWSER=/tmp/devcontainer-browser-wrapper in your shell."))
+              (delete-file tmpfile))))
+
+        ;; Show instructions
+        (message "To enable browser forwarding, add to your shell config (e.g., ~/.bashrc):
+  export BROWSER=/tmp/devcontainer-browser-wrapper"))
+    (user-error "No running devcontainer found")))
+
+
 (when (boundp 'savehist-additional-variables)
   (if (bound-and-true-p savehist-loaded)
       (add-to-list 'savehist-additional-variables 'devcontainer--customization-request-cache-alist)
